@@ -46,12 +46,14 @@ class AddressList {
 
         void tick(){
             for(size_t i = 0; i<addr_len; i++){
-                addr_storage[i].last_seen--;
-                if(addr_storage[i].last_seen == 1){
-                    BLEAddress addr =  BLEAddress(addr_storage[i].addr);
-                    mqtt_client.publish(TOPIC_LEAVE, addr.toString().c_str());
-                    Serial.printf("%s remove\n", toString(addr_storage[i]).c_str());
-                    continue;
+                if (addr_storage[i].last_seen){
+                    addr_storage[i].last_seen--;
+                    if(addr_storage[i].last_seen == 0){
+                        BLEAddress addr =  BLEAddress(addr_storage[i].addr);
+                        mqtt_client.publish(TOPIC_LEAVE, addr.toString().c_str());
+                        Serial.printf("%s remove\n", toString(addr_storage[i]).c_str());
+                        continue;
+                    }
                 }
             }
         }
@@ -154,7 +156,7 @@ void setup() {
 	BLEDevice::init(DEVICE_NAME);
 	pBLEScan = BLEDevice::getScan(); //create new scan
 	pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-	pBLEScan->setActiveScan(false); //active scan uses more power, but get results faster
+	pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
 	pBLEScan->setInterval(1000);
 	pBLEScan->setWindow(1000);  // less or equal setInterval value
 }
