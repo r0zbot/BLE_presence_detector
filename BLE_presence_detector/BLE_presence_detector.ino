@@ -1,5 +1,6 @@
 #include <PubSubClient.h>
 #include <BLEDevice.h>
+#include <BLEBeacon.h>
 #include <BLEUtils.h>
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
@@ -7,7 +8,7 @@
 #include <WiFi.h>
 
 
-#define SCAN_TIME 1 // Time between each scan/tick in seconds
+#define SCAN_TIME 2 // Time between each scan/tick in seconds
 #define SEEN_TICKS 10 // How many ticks until a device is considered gone
 #define RSSI_THRESHOLD -80 // Signals below this will be filtered
 #define MAX_LEN 100 // Maximum amount of tracked MAC addresses
@@ -19,10 +20,15 @@
 
 #define TOPIC_LEAVE "BLE_presence_detector/leave"
 #define TOPIC_JOIN "BLE_presence_detector/join"
+#define CONFIGURATION_TOPIC "homeassistant/binary_sensor/ble_presence_%s/", address
+#define STATE_TOPIC "homeassistant/binary_sensor/ble_presence_%s/", address
+
 
 BLEScan* pBLEScan;
 WiFiClient wifi_client;
 PubSubClient mqtt_client(wifi_client);
+String hass_topic = "homeassistant/binary_sensor/ble_presence_";
+
 
 struct AddressEntry {
     esp_bd_addr_t addr;
@@ -58,6 +64,11 @@ class AddressList {
             }
         }
 
+        void mqtt_publish(BLEAddress addr){
+            mqtt_client.publish((hass_topic+addr.toString().c_str()+"/config").c_str(), addr.toString().c_str());
+            String payload = "{'name': 'garden', 'device_class': 'motion', 'state_topic': 'homeassistant/binary_sensor/garden/state'}";
+        }
+
         bool seen(BLEAddress search_addr){
             size_t empty_space = 0; // this should point to the first empty space if it exists
             for(size_t i = 0; i<addr_len; i++){
@@ -91,6 +102,7 @@ class AddressList {
                     return false; // oshit, the list is full;
                 }
             }
+            
             mqtt_client.publish(TOPIC_JOIN, search_addr.toString().c_str());
 
             //TODO: Send signal for discovery
@@ -156,9 +168,9 @@ void setup() {
 	BLEDevice::init(DEVICE_NAME);
 	pBLEScan = BLEDevice::getScan(); //create new scan
 	pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-	pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
-	pBLEScan->setInterval(1000);
-	pBLEScan->setWindow(1000);  // less or equal setInterval value
+	pBLEScan->setActiveScan(false); //active scan uses more power, but get results faster
+	pBLEScan->setInterval(100);
+	pBLEScan->setWindow(90);  // less or equal setInterval value
 }
 void mqtt_reconnect(){
      // Connect to the broker
@@ -184,7 +196,7 @@ void loop() {
         Serial.printf("Lost WiFi connection!");
         ESP.restart();
     }
-    if (!mqtt_client.connected()){
+    if (!mqtt_client.loop()){
         // But if its just mqtt, try to reconect
         Serial.printf("Lost MQTT connection! Trying to reconnect...");
         mqtt_reconnect();
