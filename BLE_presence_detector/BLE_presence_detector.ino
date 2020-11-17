@@ -9,11 +9,12 @@
 
 #define SCAN_TIME 1 // Time between each scan/tick in seconds
 #define SEEN_TICKS 10 // How many ticks until a device is considered gone
-#define RSSI_THRESHOLD -75 // Signals below this will be filtered
+#define RSSI_THRESHOLD -80 // Signals below this will be filtered
 #define MAX_LEN 100 // Maximum amount of tracked MAC addresses
 #define WIFI_WAIT 90 // Amount/2 of time to wait for WiFi before resetting everything (ex: 90 == 45 seconds)
 #define BROKER_WAIT 30 // Amount of time in seconds to wait for the broker before resetting everything 
 
+//TODO document gitignored stuff
 #define DEVICE_NAME "BLE_presence_detector"
 
 #define TOPIC_LEAVE "BLE_presence_detector/leave"
@@ -45,13 +46,13 @@ class AddressList {
 
         void tick(){
             for(size_t i = 0; i<addr_len; i++){
-                if(!addr_storage[i].last_seen){
+                addr_storage[i].last_seen--;
+                if(addr_storage[i].last_seen == 1){
                     BLEAddress addr =  BLEAddress(addr_storage[i].addr);
                     mqtt_client.publish(TOPIC_LEAVE, addr.toString().c_str());
                     Serial.printf("%s remove\n", toString(addr_storage[i]).c_str());
                     continue;
                 }
-                addr_storage[i].last_seen--;
             }
         }
 
@@ -153,9 +154,9 @@ void setup() {
 	BLEDevice::init(DEVICE_NAME);
 	pBLEScan = BLEDevice::getScan(); //create new scan
 	pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-	pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
-	pBLEScan->setInterval(100);
-	pBLEScan->setWindow(99);  // less or equal setInterval value
+	pBLEScan->setActiveScan(false); //active scan uses more power, but get results faster
+	pBLEScan->setInterval(1000);
+	pBLEScan->setWindow(1000);  // less or equal setInterval value
 }
 void mqtt_reconnect(){
      // Connect to the broker
@@ -193,5 +194,4 @@ void loop() {
     addr_list.tick();
 	Serial.println("Scan done!");
 	pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
-	delay(2000);
 }
