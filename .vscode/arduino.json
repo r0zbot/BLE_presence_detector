@@ -1,7 +1,7 @@
 {
     "programmer": "USBtinyISP",
     "board": "esp32:esp32:esp32",
-    "configuration": "PSRAM=disabled,PartitionScheme=default,CPUFreq=240,FlashMode=qio,FlashFreq=80,FlashSize=4M,UploadSpeed=921600,DebugLevel=none",
+    "configuration": "PSRAM=disabled,PartitionScheme=min_spiffs,CPUFreq=240,FlashMode=qio,FlashFreq=80,FlashSize=4M,UploadSpeed=921600,DebugLevel=none",
     "port": "COM8",
     "sketch": "BLE_presence_detector\\BLE_presence_detector.ino",
     "output": "C:\\Temp\\arduino_build"

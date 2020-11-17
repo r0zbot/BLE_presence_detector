@@ -15,3 +15,9 @@
 * **Descreva como o hardware irá se comunicar. Se será por meio de alguma API ou outra tecnologia.**
   * Será utilizado MQTT para comunicação com um servidor do Home Assistant rodando na rede local.
 
+
+## Informações adicionais
+### Ignorando linhas no commit
+https://stackoverflow.com/questions/16244969/how-to-tell-git-to-ignore-individual-lines-i-e-gitignore-for-specific-lines-of
+`git config filter.gitignore.clean "sed '/#gitignore/d'"`
+`git config filter.gitignore.smudge cat`
