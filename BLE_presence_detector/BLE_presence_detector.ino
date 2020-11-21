@@ -7,141 +7,89 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
+// ---------------- Configurações---------------
+
+
+#define DEVICE_NAME "BLE_presence_detector"
 
 #define SCAN_TIME 2 // Time between each scan/tick in seconds
 #define SEEN_TICKS 10 // How many ticks until a device is considered gone
 #define RSSI_THRESHOLD -80 // Signals below this will be filtered
-#define MAX_LEN 100 // Maximum amount of tracked MAC addresses
 #define WIFI_WAIT 90 // Amount/2 of time to wait for WiFi before resetting everything (ex: 90 == 45 seconds)
-#define BROKER_WAIT 30 // Amount of time in seconds to wait for the broker before resetting everything 
+#define BROKER_WAIT 30 // Amount of time in seconds to wait for the broker to connect before resetting everything 
 
-//TODO document gitignored stuff
-#define DEVICE_NAME "BLE_presence_detector"
+// -------------- Fim das configurações---------------
 
-#define TOPIC_LEAVE "BLE_presence_detector/leave"
-#define TOPIC_JOIN "BLE_presence_detector/join"
-#define CONFIGURATION_TOPIC "homeassistant/binary_sensor/ble_presence_%s/", address
-#define STATE_TOPIC "homeassistant/binary_sensor/ble_presence_%s/", address
 
+#define foreach_tracked_address() for(size_t i = 0; i<sizeof(tracked_addresses)/sizeof(tracked_addresses[0]); i++)
 
 BLEScan* pBLEScan;
 WiFiClient wifi_client;
 PubSubClient mqtt_client(wifi_client);
-String hass_topic = "homeassistant/binary_sensor/ble_presence_";
 
 
-struct AddressEntry {
-    esp_bd_addr_t addr;
-    int last_seen; // when it reaches 0, the device is considered to be gone
-};
-class AddressList {
-    public:
-        size_t get_index(BLEAddress search_addr){
-            for(size_t i = 0; i<addr_len; i++){
-                if(!addr_storage[i].last_seen){
-                    continue;
-                }
+int last_seens[sizeof(tracked_addresses)/sizeof(tracked_addresses[0])];
 
-                BLEAddress addr =  BLEAddress(addr_storage[i].addr);
-                if (addr.equals(search_addr)){
-                    return i;
-                }
-            }
-            return -1;
-        }
+String getAddrName(BLEAddress addr){
+    String addr_str = String(addr.toString().c_str());
+    addr_str.replace(":","-");
+    return "ble_presence_" + addr_str;
+}
 
-        void tick(){
-            for(size_t i = 0; i<addr_len; i++){
-                if (addr_storage[i].last_seen){
-                    addr_storage[i].last_seen--;
-                    if(addr_storage[i].last_seen == 0){
-                        BLEAddress addr =  BLEAddress(addr_storage[i].addr);
-                        mqtt_client.publish(TOPIC_LEAVE, addr.toString().c_str());
-                        Serial.printf("%s remove\n", toString(addr_storage[i]).c_str());
-                        continue;
-                    }
-                }
+void mqtt_publish(BLEAddress addr, String payload){
+    mqtt_client.publish(("homeassistant/binary_sensor/"+getAddrName(addr)+"/state").c_str(), payload.c_str());
+}
+
+void mqtt_register(){
+    foreach_tracked_address(){
+        BLEAddress addr = tracked_addresses[i];
+        String name = getAddrName(addr);
+        String payload = "{\"name\": \""+name+"\", \"device_class\": \"presence\", \"state_topic\": \"homeassistant/binary_sensor/"+name+"/state\"}";
+        mqtt_client.publish(("homeassistant/binary_sensor/"+name+"/config").c_str(), payload.c_str());
+    }
+}
+
+void tick(){
+    Serial.println("tick:");
+    foreach_tracked_address(){
+        if (last_seens[i]){
+            last_seens[i]--;
+            if(last_seens[i] == 0){
+                mqtt_publish(tracked_addresses[i], "OFF");
+                printAddress(i, " is gone!");
             }
         }
+        printAddress(i, "tick");
+    }
+}
 
-        void mqtt_publish(BLEAddress addr){
-            mqtt_client.publish((hass_topic+addr.toString().c_str()+"/config").c_str(), addr.toString().c_str());
-            String payload = "{'name': 'garden', 'device_class': 'motion', 'state_topic': 'homeassistant/binary_sensor/garden/state'}";
-        }
+void printAddress(size_t index, String extra_text){
+    Serial.print(tracked_addresses[index].toString().c_str());
+    Serial.print(" ");
+    Serial.print(last_seens[index]);
+    Serial.print(" ");
+    Serial.println(extra_text);
+}
 
-        bool seen(BLEAddress search_addr){
-            size_t empty_space = 0; // this should point to the first empty space if it exists
-            for(size_t i = 0; i<addr_len; i++){
-                if(!addr_storage[i].last_seen){
-                    if(!empty_space) empty_space = i;
-                    continue;
-                }
-
-                BLEAddress addr =  BLEAddress(addr_storage[i].addr);
-                if (addr.equals(search_addr)){
-                    addr_storage[i].last_seen = SEEN_TICKS; // reset last_seen status
-                    Serial.printf("%s tick\n", toString(addr_storage[i]).c_str());
-                    return false; // Address already exists
-                }
+void seen(BLEAddress search_addr){
+    foreach_tracked_address(){
+        if(search_addr.equals(tracked_addresses[i])){
+            if (!last_seens[i]){
+                mqtt_publish(search_addr, "ON");
+                printAddress(i, "found!");
             }
-            AddressEntry entry;
-            memcpy(entry.addr, search_addr.getNative(), ESP_BD_ADDR_LEN);
-            entry.last_seen = SEEN_TICKS;
-            if (empty_space){
-                addr_storage[empty_space] = entry;
-                Serial.printf("%s add (hole)\n", toString(entry).c_str());
-            }
-            else{
-                if(addr_len < MAX_LEN){
-                    Serial.printf("%s add\n", toString(entry).c_str());
-                    addr_storage[addr_len++] = entry;
-                }
-                else{
-                    //TODO: send signal for LIST FULL
-                    Serial.printf("THE LIST IS FULL!\n");
-                    return false; // oshit, the list is full;
-                }
-            }
-            
-            mqtt_client.publish(TOPIC_JOIN, search_addr.toString().c_str());
-
-            //TODO: Send signal for discovery
-            return true; // Address was added
+            last_seens[i] = SEEN_TICKS;
+            return;
         }
-
-        String toString(){
-            String out;
-            for(size_t i = 0; i<addr_len; i++){
-                if(addr_storage[i].last_seen){
-                    out += toString(addr_storage[i]).c_str();
-                    out += "\n";
-                }
-            }
-            return out;
-        }
-
-        String toString(AddressEntry entry){
-            String out;
-            out += BLEAddress(entry.addr).toString().c_str();
-            out += " ";
-            out += entry.last_seen;
-            return out;
-        }
-
-        size_t size(){
-            // this is wrong
-            return addr_len;
-        }
-    private:
-        size_t addr_len = 0;
-        AddressEntry addr_storage[MAX_LEN];
-};
-AddressList addr_list;
+    }
+    Serial.printf("Unknown device: %s\n", search_addr.toString().c_str());
+    
+}
 class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 	    void onResult(BLEAdvertisedDevice advertisedDevice) {
 	    	// RSSI = Received signal strength indication
 	    	if (advertisedDevice.getRSSI() > RSSI_THRESHOLD){
-                addr_list.seen(advertisedDevice.getAddress());
+                seen(advertisedDevice.getAddress());
             }
             else{
 	    	    Serial.printf("Device filtered: %s  RSSI: %d\n", advertisedDevice.getAddress().toString().c_str(), advertisedDevice.getRSSI());
@@ -162,7 +110,10 @@ void setup() {
         if(tries++ == WIFI_WAIT) ESP.restart();
     }
 
-   
+    // set all devices to not seen
+    foreach_tracked_address(){
+        last_seens[i] = 0;
+    }
 
 	Serial.println("Starting scan...");
 	BLEDevice::init(DEVICE_NAME);
@@ -188,6 +139,7 @@ void mqtt_reconnect(){
         }
         if(tries++ == BROKER_WAIT) ESP.restart();
     }
+    mqtt_register();
 }
 
 void loop() {
@@ -202,10 +154,7 @@ void loop() {
         mqtt_reconnect();
     }
 	BLEScanResults foundDevices = pBLEScan->start(SCAN_TIME, false);
-	Serial.print("Devices found: ");
-	Serial.println(foundDevices.getCount());
-    Serial.printf("list: %d\n%s", addr_list.size(), addr_list.toString().c_str());
-    addr_list.tick();
+    tick();
 	Serial.println("Scan done!");
 	pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
 }
