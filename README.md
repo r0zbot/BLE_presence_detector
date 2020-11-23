@@ -1,11 +1,13 @@
 # Detector de presença BLE com integração ao Home Assistant
 
+  [Link do repositório](https://github.com/r0zbot/BLE_presence_detector)
+
   Este repositório contém o código do projeto final da matéria [MAC0546/6929 - Fundamentos da Internet das Coisas (2020)](https://edisciplinas.usp.br/course/view.php?id=82628) e instruções para uso e compilação.
 ## Objetivo
-  O objetivo desse projeto é permitir que, a partir do endereço MAC de um dispositivo Bluetooth, verificar se ele está ou não presente em um determinado local. 
+  O objetivo desse projeto é permitir que, a partir do endereço MAC de um dispositivo Bluetooth, verificar se ele está ou não presente em um determinado local, implementando também mensagens de um _binary_sensor_ do Home Assistant com MQTT. Para isso, são detectados os beacons de anúncio dos dispositivos que contém o MAC address e medido o sinal de recepção. Caso o sinal seja maior que um valor definido em `RSSI_THRESHOLD`, o dispositivo será considerado presente. Caso nenhum beacon seja recebido dos dispositivo em `SEEN_TICKS` ticks, tendo um tick a duração de `SCAN_TIME` segundos, ele é considerado como ausente.
 
   Foi implementado um _binary_sensor_ do Home Assistant da seguinte forma:  
-  Para cada dispositivo rastreado, ele envia ON para `homeassistant/binary_sensor/ble_presence_00-00-00-00-00-00/state` (sendo `00-00-00-00-00-00` o endereço MAC do dispositivo rastreado em questão) ao detectar a presença, e OFF quando ele não está mais presente por um número determinado de scans. Para aumentar a quantidade de dispositivos compatíveis, esse projeto foi implementado como um _binary_sensor_ ao invés de um módulo de _room_presence_.
+  Para cada dispositivo rastreado, ele envia ON para `homeassistant/binary_sensor/ble_presence_00-00-00-00-00-00/state` (sendo `00-00-00-00-00-00` o endereço MAC do dispositivo rastreado em questão) ao detectar a presença, e OFF quando ele não está mais presente (para aumentar a quantidade de dispositivos compatíveis, esse projeto foi implementado como um _binary_sensor_ ao invés de um módulo de _room_presence_).
 
   Com isso, você pode detectar a presença ou não de determinados indivíduos em um ambiente. Caso você possua mais sensores e mais Zonas registradas no Home Assistant, também é possível rastrear em qual delas o indivíduo está.
 
@@ -14,7 +16,6 @@
 ↓
 
 ![home](imgs/hass_away.png)
-
 
 ## Instruções
 
@@ -34,26 +35,9 @@ Depois disso, vá até `Ferramentas → Placa → Gerenciador de Placas` e procu
 
 ### Configurando
 
-Abra o sketch BLE_presence_detector e adicione à seção de configurações (no topo do arquivo) as seguintes linhas, substituindo-as pelos valores adequados à sua rede:
+Faça uma cópia do arquivo `BLE_presence_detector/config.h.example` para `BLE_presence_detector/config.h` e modifique as configurações de acordo com a sua rede.
 
-```cpp
-#define SSID "NOME_DA_SUA_REDE"
-#define PASSWORD  "SENHA_DA_SUA_REDE"
-#define MQTTSERVER "192.168.1.123"
-#define MQTTPORT 1883
-
-// caso você esteja usando Mosquitto, esse pode ser também um usuário do Home Assistant.
-#define MQTTUSER "usuariomqtt"
-#define MQTTPASSWORD "senhamqtt"
-
-// Adicione seus endereços MAC abaixo
-BLEAddress tracked_addresses[] = {
-    BLEAddress("00:00:00:00:00:00"),
-    BLEAddress("11:11:11:11:11:11")
-};
-```
-
-Os BLEAddress acima são os endereços MAC dos dispositivos a serem rastreados. Caso você não saiba qual é o MAC de seus dispositivos, você pode executar o sketch `BLE_scan` para verificar quais são os dispositivos encontrados (ele as exibirá no Monitor Serial). Logo abaixo, há mais algumas configurações que podem ser editadas caso necessário.
+Os BLEAddress são os endereços MAC dos dispositivos a serem rastreados. Caso você não saiba qual é o MAC de seus dispositivos, você pode executar o sketch `BLE_scan` para verificar quais são os dispositivos encontrados (ele as exibirá no Monitor Serial). Logo abaixo, há mais algumas configurações que podem ser editadas caso necessário.
 
 ### Enviando o sketck ao ESP32
 

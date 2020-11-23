@@ -7,19 +7,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
-// ---------------- Configurações---------------
-
-
-#define DEVICE_NAME "BLE_presence_detector"
-
-#define SCAN_TIME 2 // Time between each scan/tick in seconds
-#define SEEN_TICKS 10 // How many ticks until a device is considered gone
-#define RSSI_THRESHOLD -80 // Signals below this will be filtered
-#define WIFI_WAIT 90 // Amount/2 of time to wait for WiFi before resetting everything (ex: 90 == 45 seconds)
-#define BROKER_WAIT 30 // Amount of time in seconds to wait for the broker to connect before resetting everything 
-
-// -------------- Fim das configurações---------------
-
+#include "config.h"
 
 #define foreach_tracked_address() for(size_t i = 0; i<sizeof(tracked_addresses)/sizeof(tracked_addresses[0]); i++)
 

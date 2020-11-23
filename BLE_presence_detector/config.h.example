@@ -1,0 +1,24 @@
+#include <BLEAddress.h>
+
+#define SSID "NOME_DA_SUA_REDE"
+#define PASSWORD  "SENHA_DA_SUA_REDE"
+#define MQTTSERVER "192.168.1.123"
+#define MQTTPORT 1883
+
+// caso você esteja usando Mosquitto, esse pode ser também um usuário do Home Assistant.
+#define MQTTUSER "usuariomqtt"
+#define MQTTPASSWORD "senhamqtt"
+
+// Adicione seus endereços MAC abaixo
+BLEAddress tracked_addresses[] = {
+    BLEAddress("00:00:00:00:00:00"),
+    BLEAddress("11:11:11:11:11:11")
+};
+
+#define DEVICE_NAME "BLE_presence_detector"
+
+#define SCAN_TIME 2 // Time between each scan/tick in seconds
+#define SEEN_TICKS 10 // How many ticks until a device is considered gone
+#define RSSI_THRESHOLD -80 // Signals below this will be filtered
+#define WIFI_WAIT 90 // Amount/2 of time to wait for WiFi before resetting everything (ex: 90 == 45 seconds)
+#define BROKER_WAIT 30 // Amount of time in seconds to wait for the broker to connect before resetting everything 
